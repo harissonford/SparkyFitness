@@ -44,7 +44,9 @@
 - `upstream` = `github.com/CodeWithCJ/SparkyFitness`
 - Branches:
   - `main` — espelha `upstream/main` (não editar; só fast-forward).
-  - `personalizacao` — branch de trabalho. Hoje = `upstream/main` + ajustes locais (ver §5).
+  - `personalizacao` — branch de trabalho. = `upstream/main` + **commits próprios de docs** (`PERSONALIZACAO.md`, `RELATORIO_SEED_REFEICOES.md`) por cima + ajustes locais não commitados (ver §5).
+
+> ⚠️ Como a `personalizacao` **tem commits próprios**, ela **NÃO é mais fast-forward** do upstream. Use **`git rebase upstream/main`** (mantém os commits de docs no topo, linear) — `git merge --ff-only` vai falhar. Após rebase, o push precisa de `--force-with-lease` (a history foi reescrita).
 
 ### Atualizar o git com o upstream (sem perder personalização)
 ```bash
@@ -53,18 +55,21 @@ git fetch upstream --prune
 # guarda ajustes locais não commitados (bind 127.0.0.1)
 git stash push -m "ajustes locais" docker/docker-compose.dev.yml docker/docker-compose.db_dev.yml
 
-# atualiza a branch de trabalho
+# rebase a branch de trabalho sobre o upstream (replaya os commits de docs no topo)
 git checkout personalizacao
-git merge --ff-only upstream/main      # ou 'git rebase upstream/main' se houver commits próprios
+git rebase upstream/main
 
 # reaplica os ajustes locais
 git stash pop
 
-# espelha main e envia ao fork
+# espelha main (fast-forward puro) e envia tudo ao fork
 git branch -f main upstream/main
-git push origin personalizacao main
+git push --force-with-lease origin personalizacao
+git push origin main
 ```
 > Se o `stash pop` conflitar: os ajustes locais são só a linha da porta do Postgres — resolver mantendo `"127.0.0.1:5432:5432"`.
+> Se o `rebase` conflitar: preferir o upstream no código e manter os arquivos de docs; se ficar ambíguo, `git rebase --abort` e revisar manualmente.
+> O diretório `ha/` (toolkit de alta disponibilidade) fica **untracked** — não commitar, e nunca commitar `ha/node.env` (tem segredo).
 
 ---
 
@@ -72,29 +77,48 @@ git push origin personalizacao main
 
 > **Sempre faça backup antes (§4).** As migrations são aditivas, mas backup é obrigatório.
 
+> 🚫 **NUNCA rode `docker compose pull` neste deploy.** O upstream **parou de republicar as imagens no Docker Hub** (`codewithcj/*:latest` congeladas desde ~2026-07-06). Um `pull` **sobrescreveria as imagens que buildamos localmente com versões antigas = downgrade** em cima dos seus dados. A atualização aqui é **build local** a partir do código já sincronizado (§2).
+
 ```bash
 cd /Volumes/FORD_2TB/claudeAI/projetos/SparkyFitness
 C="-p docker -f docker/docker-compose.prod.yml -f docker/docker-compose.local.yml"
+TS=$(date +%Y%m%d)
 
-# 1. Backup do banco (ver §4)
+# 1. Backup do banco (ver §4) — OBRIGATÓRIO
 
-# 2. Puxa imagens novas
-docker compose $C pull
+# 2. Marca as imagens atuais como rollback (pra voltar rápido se algo quebrar)
+docker tag codewithcj/sparkyfitness_server:latest codewithcj/sparkyfitness_server:rollback-$TS
+docker tag codewithcj/sparkyfitness:latest        codewithcj/sparkyfitness:rollback-$TS
 
-# 3. Recria containers (o DB não é recriado; server aplica migrations no boot)
+# 3. Build LOCAL das imagens (BuildKit é obrigatório — os Dockerfiles usam --platform=$BUILDPLATFORM)
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.backend  -t codewithcj/sparkyfitness_server:latest .
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.frontend -t codewithcj/sparkyfitness:latest .
+
+# 4. Recria containers (o DB não é recriado; server aplica migrations no boot). SEM --pull, SEM --build de dev.
 docker compose $C up -d
 
-# 4. Acompanha as migrations
+# 5. Acompanha as migrations
 docker logs docker-sparkyfitness-server-1 2>&1 | grep -iE "migrat|RLS|listening"
 
-# 5. Verifica saúde
+# 6. Verifica saúde + confirma que roda as imagens novas (não as antigas do Hub)
 docker ps --filter name=sparky --format 'table {{.Names}}\t{{.Status}}'
+curl -sf http://localhost:3004/api/health   # => {"status":"UP"}
 ```
 
-### Checar se há imagem nova publicada (antes de atualizar)
+> **Pré-requisito de build:** o plugin `docker-buildx` (instalado via `brew install docker-buildx`, com symlink em `~/.docker/cli-plugins/docker-buildx`). Sem ele, o build falha com `BuildKit is enabled but the buildx component is missing`.
+
+### Rollback (se o update quebrar)
 ```bash
-curl -s https://hub.docker.com/v2/repositories/codewithcj/sparkyfitness_server/tags/latest \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['tag_last_pushed'])"
+docker tag codewithcj/sparkyfitness_server:rollback-$TS codewithcj/sparkyfitness_server:latest
+docker tag codewithcj/sparkyfitness:rollback-$TS        codewithcj/sparkyfitness:latest
+docker compose $C up -d
+# se necessário, restaurar o banco pelo dump do §4
+```
+
+### Quando atualizar
+O gatilho é **avanço do git upstream** (§2), não "imagem nova no Hub" (que não sai mais). Depois de `git rebase upstream/main`, rebuilde local com os passos acima. Para ver quanto o upstream andou:
+```bash
+git fetch upstream && git rev-list --count HEAD..upstream/main   # nº de commits atrás
 ```
 Há também um script de aviso automático: `/Volumes/FORD_2TB/claudeAI/scripts/sparky-auto-update.sh`
 com **cron diário às 9h em modo `--check`** (só notifica, não atualiza sozinho).
@@ -200,6 +224,14 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-08-01 — App atualizado para **v1.6.0** (build local); 2º usuário + compartilhamento família
+- Git `personalizacao` `906aaa57` → `5552a21c` (rebase sobre upstream), `main` `36661741` → `d9eca4f5`. **217 commits** do upstream, tag **v1.6.0**. Push com `--force-with-lease`.
+- **App rebuildado LOCALMENTE** (server `83a23f49`, front `ce7064df`); imagens antigas salvas como `:rollback-20260801`. Backup pré-update: `~/.sparkyfitness/backups/sparky_backup_preupdate_20260801_204528.dump` (~801K).
+- **5 migrations novas** aplicadas no boot (spray medication, múltiplos meal plans ativos, distância/modalidade de treino, formato de hora, workout preset set distance). RLS reaplicada, health UP.
+- Dados preservados: users=2, foods=721, meals=942, food_entries=59, family_access=2.
+- **2º usuário (família):** `agatha.criar@gmail.com` (role `user`), criado via `POST /api/auth/sign-up/email`. **Compartilhamento família BIDIRECIONAL só-leitura** (2 linhas em `family_access`, perms `can_view_food_library`+`can_view_exercise_library`+`can_view_reports`, todas `can_manage_*`=false). `can_view_reports` inclui leitura de diário/medidas/relatórios/**medicações**.
+- **Este runbook (§2 e §3) foi corrigido:** git agora é **rebase** (não ff-only) e app é **build local** (não `docker compose pull`).
 
 ### 2026-07-10 — Git avançado para `78b31c26`; app mantido em v0.17.3
 - Git `personalizacao`/`main` `04b94639` → `78b31c26` (13 commits, ff) e enviados ao fork.
