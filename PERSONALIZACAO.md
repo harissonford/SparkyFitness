@@ -2,16 +2,17 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-07-08.**
+> **Última atualização: 2026-08-07.**
 
 ---
 
 ## 1. Como este ambiente roda
 
-- **Não é build local.** O app roda a partir das **imagens prontas** publicadas no Docker Hub:
-  - `codewithcj/sparkyfitness:latest` (frontend)
-  - `codewithcj/sparkyfitness_server:latest` (servidor)
-  - `postgres:18.3-alpine` (banco)
+- **É build local.** As imagens do app são **construídas aqui** a partir do código-fonte já sincronizado (§3)
+  e apenas *carregam os nomes* das imagens do Docker Hub, que estão congeladas desde ~2026-07-06:
+  - `codewithcj/sparkyfitness:latest` (frontend) — build local
+  - `codewithcj/sparkyfitness_server:latest` (servidor) — build local
+  - `postgres:18.3-alpine` (banco) — esta sim vem pronta do Docker Hub
 - Orquestração via Docker Compose, **projeto `docker`**, com dois arquivos:
   ```
   docker/docker-compose.prod.yml + docker/docker-compose.local.yml
@@ -34,7 +35,7 @@
 - DB `sparkyfitness_db`, user `sparky`.
 - Criptografia de segredos de provedores: `SPARKY_FITNESS_API_ENCRYPTION_KEY` (AES-256-GCM).
 - Migrations são aplicadas **automaticamente no boot do servidor**; RLS (Row-Level Security) é reaplicado a cada start.
-- **Importante:** atualizar o *código-fonte* (git) **não** muda o app rodando. O app só muda quando você **puxa imagens novas** e recria os containers (ver §3).
+- **Importante:** atualizar o *código-fonte* (git) **não** muda o app rodando. O app só muda quando você **rebuilda as imagens localmente** e recria os containers (ver §3).
 
 ---
 
@@ -224,6 +225,35 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-08-07 — App atualizado para **v1.6.1** (build local); trabalho local de treino substituído pelo upstream
+- Git `personalizacao` `844c0212` → `08546e65` (rebase sobre upstream, os 2 commits de docs recolocados por cima + este registro),
+  `main` `1d4f4df5` → `22415819`. **44 commits** do upstream, tag **v1.6.1**. Push com `--force-with-lease`.
+- **Nenhuma migration nova** — os 202 arquivos de `db/migrations/` são idênticos dos dois lados. O banco **não foi recriado**;
+  só servidor e frontend. RLS reaplicada no boot.
+- **App rebuildado LOCALMENTE** (backend 1,16 GB, frontend 105 MB). O primeiro build falhou por erro transitório de rede
+  no `pnpm install` dentro do container; repetir o comando resolveu.
+- Backup pré-update: `~/.sparkyfitness/backups/sparky_pre_upstream_20260807_230044.dump` (968K, 104 tabelas validadas).
+- Dados preservados: `food_entries`=605, `foods`=1367, `meal_plan_template_assignments`=133, users=2, `water_intake`=17.
+  Diário de 07/08 conferido pela API: 19 itens, como esperado do template.
+- ⚠️ **Trabalho local não commitado foi substituído pelo upstream** (5 conflitos, todos resolvidos a favor do upstream):
+  - Classificação de atividade: o `classifyHealthActivity` local (correspondência exata) foi superado pelo
+    `resolveActivityMapping` do upstream (radicais, qualificadores de esteira/ergômetro, modalidade explícita do cliente).
+    Duas divergências deliberadas do upstream: musculação vira `weight_reps` (não `duration`) e **não existe** categoria
+    `Flexibility` — ioga/pilates caem em `Cardio`.
+  - `avg_heart_rate`: o upstream **deriva no servidor** a partir de `hr_samples` (`workoutTelemetryDerivation.ts`).
+    A linha local ficava *antes* do spread `...telemetry`, então seria sobrescrita — e como o mobile passou a enviar
+    `hr_samples` em vez de `avgHeartRate`, ela gravaria `null`.
+  - Nada foi apagado: patch em `~/.sparkyfitness/backups/local_uncommitted_20260807_200529.patch` (343 linhas),
+    os 3 arquivos fora do git em `~/.sparkyfitness/backups/superseded_healthActivityCategory_20260807_200529/`,
+    e a entrada `stash@{0}` no repo.
+  - Os 3 arquivos saíram do repo porque `healthDataHandlers.workout.test.ts` afirmava o comportamento antigo
+    e deixaria a suíte vermelha para sempre.
+- Ajustes locais de infra (`127.0.0.1:5432` nos dois compose de dev) sobreviveram e convivem com a mudança do upstream
+  no mesmo arquivo (`GARMIN_MICROSERVICE_URL` parametrizado).
+- **Teste falhando que NÃO é regressão:** `tests/outboundProxy.test.ts` (1 de 3.107) quebra com `ENOTFOUND proxied.test`
+  só na variante de `fetch` nativo — as de axios passam. É o undici não herdando o proxy neste Node 26, ambiente e não código.
+- **Este runbook (§1) foi corrigido:** dizia "não é build local" e "puxa imagens novas", contradizendo §2/§3.
 
 ### 2026-08-01 — App atualizado para **v1.6.0** (build local); 2º usuário + compartilhamento família
 - Git `personalizacao` `906aaa57` → `5552a21c` (rebase sobre upstream), `main` `36661741` → `d9eca4f5`. **217 commits** do upstream, tag **v1.6.0**. Push com `--force-with-lease`.
