@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-08-07.**
+> **Última atualização: 2026-08-11.**
 
 ---
 
@@ -225,6 +225,31 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-08-11 — Sincronizado com o upstream **pós-v1.6.1** (build local); 1ª migration nova desde julho
+- `main` `22415819` → `77a93080`; `personalizacao` = `77a93080` + os 3 commits de docs recolocados por cima
+  (os 2 antigos + este registro). **27 commits** do upstream.
+  **Ainda não há release nova**: o `package.json` continua em `1.6.1` e nenhuma tag aponta para `77a93080` —
+  é o estado de desenvolvimento depois da v1.6.1, não uma v1.6.2.
+- Rebase **sem nenhum conflito** (meus 3 commits só tocam `PERSONALIZACAO.md` e `RELATORIO_SEED_REFEICOES.md`).
+  Os ajustes de `127.0.0.1:5432` foram guardados com `git stash` e recolocados limpos — o upstream não mexeu em `docker/`.
+- ⚠️ **Uma migration nova** (`20260807000000_add_record_timezone_to_sleep_entries.sql`) — diferente das últimas vezes,
+  desta vez o banco *foi* alterado. É puramente aditiva: duas colunas nulas (`record_timezone`,
+  `record_utc_offset_minutes`) com `IF NOT EXISTS`; linhas antigas continuam renderizando igual. Aplicada com sucesso
+  no boot, confirmada em `information_schema`.
+- Backup pré-update: `~/.sparkyfitness/backups/pre-upstream-20260811_223606.dump` (990K, 104 tabelas validadas
+  com `pg_restore -l` **dentro do container** — no host o `pg_restore` dá falso negativo de "0 TABLE DATA").
+- Imagens anteriores marcadas como `codewithcj/sparkyfitness{,_server}:rollback-20260811` antes do rebuild.
+- Dados preservados (idênticos antes/depois): `foods`=1367, `food_entries`=615, `exercise_entries`=143,
+  `sleep_entries`=26, users=2.
+- Testes: **2.945 passando**, 1 falhando — a mesma `outboundProxy.test.ts` ambiental de sempre (undici/Node 26).
+- A VM `odysseus` estava **parada** no início; subiu com `colima start odysseus` e o stack voltou junto.
+- `pnpm` não está mais instalado no host — os testes rodaram com
+  `SparkyFitnessServer/node_modules/.bin/vitest run`. O build não depende disso (é dentro do container).
+- ❗ **Não consegui fazer a leitura autenticada pela API** como nas vezes anteriores: o cookie do better-auth é
+  assinado (prefixo `sparky.`) e o token cru do banco não basta. Verificação ficou em: migration aplicada,
+  contagens intactas, `/api/health` UP, guard de auth devolvendo 401, frontend servindo bundle novo e a suíte de testes.
+  **Vale abrir o app e conferir o diário na tela.**
 
 ### 2026-08-07 — App atualizado para **v1.6.1** (build local); trabalho local de treino substituído pelo upstream
 - Git `personalizacao` `844c0212` → `08546e65` (rebase sobre upstream, os 2 commits de docs recolocados por cima + este registro),
