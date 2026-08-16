@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-08-11.**
+> **Última atualização: 2026-08-16.**
 
 ---
 
@@ -225,6 +225,61 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-08-16 — App atualizado para **v1.6.2** (build local); 3 migrations, fotos em alimentos/refeições
+- `main` `77a93080` → `c863180a`; `personalizacao` = `c863180a` + os 4 commits de docs por cima. **135 commits** do upstream.
+  A tag **v1.6.2** aponta para `fdcb4cd5`, que é *anterior* ao topo — estamos alguns commits depois da v1.6.2.
+  O `package.json` já diz `1.6.2` (confirmado dentro do container em execução).
+- Rebase **sem conflito**. Binds `127.0.0.1:5432` guardados/recolocados via stash; o upstream não tocou em `docker/`.
+- **Nada mudou em `docker/.env.example`, nos compose de prod nem nos Dockerfiles** — nenhuma variável nova no self-host.
+- ⚠️ **3 migrations novas**, todas aplicadas no boot (RLS reaplicada em seguida):
+  1. `20260810000000_add_images_to_foods_meals_and_food_entries` — `images jsonb NOT NULL DEFAULT '[]'` em
+     `foods`, `meals`, `food_entries`, `food_entry_meals`, + 4 CHECKs de "é array".
+  2. `20260814000000_backfill_diary_entry_images_from_parent` — **no-op aqui**: só copia foto do pai quando o pai
+     tem foto, e nenhum alimento tinha.
+  3. `20260816000000_widen_fractional_workout_telemetry_to_numeric` — `integer` → `numeric` em 8 colunas de telemetria.
+- **Mudança de comportamento:** a foto do lançamento no diário passa a ser **congelada no momento do registro**,
+  como já era a nutrição. Trocar a foto de um alimento não altera mais lançamentos passados. O upstream assume que a
+  foto original de lançamentos antigos **não é recuperável** (nunca foi guardada).
+- Backup: `~/.sparkyfitness/backups/pre-upstream-20260816_154117.dump` (864K, 104 tabelas validadas).
+  Imagens anteriores em `:rollback-20260816`.
+- Dados idênticos antes/depois: users=2, foods=1369, food_entries=620, meals=121, food_entry_meals=24,
+  exercise_entries=173, sleep_entries=32.
+
+#### Validação (6 frentes em paralelo)
+| Frente | Resultado |
+| --- | --- |
+| Servidor | 3.021 testes OK; typecheck, lint e prettier limpos |
+| Frontend | 866 testes OK; typecheck, lint e prettier limpos |
+| Shared | typecheck limpo (não tem suíte, por design) |
+| Mobile | 5.224 testes OK; typecheck limpo |
+| Banco | 206 migrations registradas, 163 policies RLS, 0 órfãos, 0 índice inválido |
+| API | 72 famílias de rotas: 401/200 corretos, zero 500, zero erro no log |
+| UI (navegador real) | diário, alimentos, refeições, exercícios, sono, relatórios e ajustes renderizando dados reais, zero erro de console |
+
+- **`pnpm` não está instalado no host.** Rodar testes com `<pacote>/node_modules/.bin/{vitest,jest,tsc,eslint}`.
+  Quando precisar do pnpm de verdade, use `npx pnpm@10.33.4` (a versão do campo `packageManager`).
+- ⚠️ **O `node_modules` do mobile estava defasado** e travava 100% da suíte: o sync trouxe `react-i18next`,
+  `i18next`, `expo-localization` e `expo-image-manipulator`, que não estavam instalados. Resolvido com
+  `npx pnpm@10.33.4 install --frozen-lockfile` (lockfile não mudou). **Sempre rodar isso após um sync grande.**
+- ⚠️ **Falhas de teste que são LOCALE, não regressão** (este host é pt-BR / America/Sao_Paulo): 3 no frontend
+  (`BackupListDialog`, espera "February 2026" e recebe "fevereiro de 2026") e 22 no mobile (medicações,
+  `formatTimeOfDay` espera "8:00 AM" e recebe "8:00"). **Comprovado**: todas passam com
+  `LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 TZ=UTC` na frente do comando. Os testes não fixam locale.
+- **Falha ambiental de sempre:** `tests/outboundProxy.test.ts` (undici não herda proxy neste Node) — não é regressão.
+- 🐞 **Bug do upstream encontrado na validação** (cosmético, ainda não corrigido aqui): em
+  `SparkyFitnessFrontend/src/pages/Reports/SleepAnalyticsCharts.tsx:322`, o botão de Relatórios → Sono mostra
+  literalmente `Show All ({{count}})`. A chamada passa o texto como *valor padrão* em vez de opções de
+  interpolação, então o `count` nunca chega ao i18next. O padrão certo está no vizinho
+  `FoodImportFromCSV.tsx:779` (`t(chave, { count, defaultValue })`). Não foi corrigido de propósito: commit de
+  código na `personalizacao` reintroduz risco de conflito no rebase, e a branch hoje é só docs.
+- 📌 **Disco da VM `odysseus` em 77%** (12,7 GB livres de 58,8 GB): 45,5 GB de imagens e **27,9 GB de build cache**.
+  Com a feature nova de fotos isso tende a piorar. Para recuperar espaço: `docker builder prune` e apagar as tags
+  `:rollback-*` mais antigas (existem 6 pares, ~1,26 GB cada).
+- 📌 **Nenhum dos 85 treinos importados tem frequência cardíaca, cadência ou GPS** (`avg_heart_rate` 0/85,
+  `exercise_entry_laps` e `exercise_entry_gps_points` vazias) — só distância (72) e calorias (85). A migration 3
+  alargou colunas que aqui estão todas vazias. Como o upstream agora *deriva* a FC de `hr_samples` no servidor,
+  vale checar se o app do celular está enviando essas amostras.
 
 ### 2026-08-11 — Sincronizado com o upstream **pós-v1.6.1** (build local); 1ª migration nova desde julho
 - `main` `22415819` → `77a93080`; `personalizacao` = `77a93080` + os 3 commits de docs recolocados por cima
