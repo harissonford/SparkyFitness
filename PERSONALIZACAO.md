@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-08-16.**
+> **Última atualização: 2026-08-17.**
 
 ---
 
@@ -225,6 +225,27 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-08-17 — Sync de manutenção (20 commits); migration que **inverte o sinal** da meta percentual
+- `main` `c863180a` → `7cd9746d`; `personalizacao` = `7cd9746d` + os 5 commits de docs. **20 commits**.
+  Continua **v1.6.2** (sem tag nova). Rebase sem conflito; nada mudou em `docker/` nem no `.env.example`.
+- ⚠️ **1 migration, e dessa vez ela ALTERA DADOS:**
+  `20260816173934_flip_goal_mode_custom_percentage_sign` faz
+  `UPDATE user_preferences SET goal_mode_custom_percentage = -goal_mode_custom_percentage WHERE ... > 0`.
+  O upstream passou a suportar ganho de peso e inverteu a convenção: agora **positivo = superávit** (comer mais)
+  e **negativo = déficit**. Valores antigos foram todos escritos como déficit positivo, por isso precisam ser negados.
+  **A migration NÃO é idempotente** — rodar duas vezes transformaria um déficit em superávit (o usuário começaria a
+  ganhar peso). O que garante segurança é só a tabela de controle do runner.
+  **Aqui foi no-op:** os 2 usuários estão em `goal_mode = 'maintain'` com percentual `0`, e o `WHERE` é `> 0`.
+  Conferido antes e depois: seguem `0`.
+- Testes do servidor: **3.037 passando**, 1 falha (a `outboundProxy.test.ts` ambiental de sempre).
+- Backup: `~/.sparkyfitness/backups/pre-upstream-20260817_185320.dump` (871K, 104 tabelas).
+  Imagens anteriores em `:rollback-20260817`.
+- Dados idênticos: users=2, foods=1369, food_entries=620, meals=121, exercise_entries=179, sleep_entries=34.
+- 📌 O **contexto do Docker estava em `colima-procuravoos`** de novo (outro perfil rouba o contexto global).
+  Sempre `docker context use colima-odysseus` antes de mexer.
+- 🔕 O workflow **Schema Backup** foi desligado no fork em 16/08, então este sync (que traz migration) **não gera
+  mais e-mail de falha**. Ver a nota da entrada anterior — não recriar os secrets.
 
 ### 2026-08-16 — App atualizado para **v1.6.2** (build local); 3 migrations, fotos em alimentos/refeições
 - `main` `77a93080` → `c863180a`; `personalizacao` = `c863180a` + os 4 commits de docs por cima. **135 commits** do upstream.
