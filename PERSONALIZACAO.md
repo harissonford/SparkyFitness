@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-08-17.**
+> **Última atualização: 2026-08-18.**
 
 ---
 
@@ -225,6 +225,45 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-08-18 — Sync de 40 commits (sem migration); upstream **mexeu no compose de prod**; faxina de disco na VM
+- `main` `7cd9746d` → `313a5067`; `personalizacao` = `313a5067` + os 6 commits de docs. **40 commits**.
+  Continua **v1.6.2** (sem tag nova). Rebase sem conflito. **Nenhuma migration** (`schema_migrations` segue em 207).
+- O grosso dos 40 commits é **localização das widgets nativas do mobile** (Android Glance / iOS WidgetKit) — não
+  afeta esta instância, que só roda web.
+- ⚠️ **`docker/docker-compose.prod.yml` e `docker/.env.example` mudaram** (primeira vez desde que o runbook existe):
+  - `SPARKY_FITNESS_DB_NAME` virou **obrigatório** (`${...:?}`) — o `docker/.env` daqui já tem, então subiu normal.
+  - A publicação do frontend virou `${SPARKY_FITNESS_FRONTEND_PORT:-3004}:${NGINX_LISTEN_PORT:-80}`. Os defaults
+    batem com o que já estava (`3004:80`), então **nada a fazer**. Se um dia mexer em `NGINX_LISTEN_PORT`, a porta
+    do container tem que acompanhar, senão o nginx escuta numa porta não publicada e o app some.
+  - Novas opcionais repassadas ao container: `NGINX_RATE_LIMIT` (default `5r/s`), `NGINX_LISTEN_PORT`,
+    `NGINX_ACCESS_LOG`, `NGINX_ERROR_LOG`, `NGINX_DUMP_CONFIG`, além do bloco OIDC, `TZ`, `NODE_ENV`,
+    diretórios customizados de upload/backup e rate limit de API key. Todas com default seguro; **não adotei
+    nenhuma** — o `docker/.env` local segue como estava.
+  - `ALLOW_PRIVATE_NETWORK_AI` (default `false`): libera **usuário não-admin** apontar URL de IA custom/ollama para
+    endereço de rede privada (risco de SSRF). Admin e as configs globais de IA já podem sempre — como você é admin,
+    **não precisa ligar**.
+  - O `.env.example` removeu as variáveis do **MCP standalone** (`SPARKY_FITNESS_MCP_PORT`, `SPARKY_FITNESS_MCP_URL`,
+    `VISION_API_*`), que estavam depreciadas. O `docker/.env` daqui nunca as teve.
+- Testes do servidor: **3.037 passando**, 1 falha (a `outboundProxy.test.ts` ambiental de sempre).
+- Backup: `~/.sparkyfitness/backups/pre-upstream-20260818_224116.dump` (876K, 104 tabelas validadas).
+  Imagens anteriores em `:rollback-20260818`.
+- Dados idênticos antes/depois: users=2, foods=1369, food_entries=620, meals=121, exercise_entries=183,
+  sleep_entries=36, migrations=207.
+- 📌 O **contexto do Docker estava em `colima-procuravoos`** de novo. Sempre `docker context use colima-odysseus`.
+
+#### Faxina de disco da VM (feito neste sync)
+O `/var/lib/docker` da VM `odysseus` estava em **87%** (49 GB de 59 GB) logo após o build. Limpeza feita:
+1. `docker rmi` dos pares de tag `:rollback-` de 22/07, 01/08, 02/08, 06/08, 11/08 e 16/08 — **mantidos só os
+   dois mais recentes** (`rollback-20260817` e `rollback-20260818`), que é rollback suficiente na prática.
+2. `docker image prune -f` (dangling) → 3,6 GB.
+3. `docker builder prune -f` (só cache **não referenciado**; não usei `-a`, que forçaria rebuild completo no
+   próximo sync) → 8,5 GB.
+
+Resultado: **87% → 51%** (28 GB livres). Stack conferida saudável depois da limpeza (frontend HTTP 200,
+`/api/health` = UP, container rodando a imagem recém-buildada `sha256:4ea89e045499`).
+Rotina sugerida: repetir os passos 1–3 quando passar de ~80%.
+
 
 ### 2026-08-17 — Sync de manutenção (20 commits); migration que **inverte o sinal** da meta percentual
 - `main` `c863180a` → `7cd9746d`; `personalizacao` = `7cd9746d` + os 5 commits de docs. **20 commits**.
