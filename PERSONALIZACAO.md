@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-08-18.**
+> **Última atualização: 2026-08-22.**
 
 ---
 
@@ -225,6 +225,23 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-08-22 — Sync de 109 commits; 4 migrations novas; duplicação de treinos e piso de segurança calórica
+- `main` `313a5067` → `72217967`; `personalizacao` = `72217967` + os 7 commits de docs por cima. **109 commits** do upstream.
+  Continua **v1.6.2** (sem tag nova). Rebase sem nenhum conflito.
+- ⚠️ **4 migrations novas**, todas aplicadas no boot com sucesso (RLS reaplicada em seguida):
+  1. `20260816192818_normalize_exercise_json_array_fields.sql` — Normalização de arrays JSON de exercícios para compatibilidade entre provedores.
+  2. `20260818020000_fix_hevy_exercise_entry_distance_units.sql` — Correção de unidades de distância em entradas vindas do Hevy.
+  3. `20260821150000_flatten_nested_exercise_image_entries.sql` — Limpeza e achatamento de arrays aninhados de imagens de exercícios.
+  4. `20260821233000_add_calorie_safety_floor_preferences.sql` — Adição de piso de segurança calórica configurável nas preferências do usuário.
+- **Novidades do upstream:** Duplicação e substituição de exercícios em presets de treino (web/mobile), piso calórico de segurança configurável (`calorie safety floor`), suporte à relação "longe das refeições" (`away-from-meals`) em medicamentos, tolerância a versões mais novas de MCP e correções em thumbnails.
+- **Build local:** `codewithcj/sparkyfitness_server:latest` e `codewithcj/sparkyfitness:latest` construídos via Docker BuildKit. Imagens anteriores preservadas em `:rollback-20260822`.
+- **Backup pré-update:** `/Volumes/FORD_2TB/claudeAI/backups/SparkyFitness_20260822_225721/` e `~/.sparkyfitness/backups/pre-upstream-20260822_225721.dump` (891K, 104 tabelas validadas).
+- **Validação de testes:**
+  - Servidor: **3.287 passando**, 1 falha ambiental (`outboundProxy.test.ts` de sempre).
+  - Frontend: **990 passando**, 0 falhas (101 suites).
+- **Dados preservados:** users=2, foods=1369, food_entries=620, meals=121, food_entry_meals=24, exercise_entries=203, sleep_entries=39, migrations=211.
+- Saúde da stack: Frontend HTTP 200, `/api/health` UP, disco da VM em 58% (23,5 GB livres).
 
 ### 2026-08-18 — Sync de 40 commits (sem migration); upstream **mexeu no compose de prod**; faxina de disco na VM
 - `main` `7cd9746d` → `313a5067`; `personalizacao` = `313a5067` + os 6 commits de docs. **40 commits**.
