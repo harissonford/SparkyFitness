@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-08-22.**
+> **Última atualização: 2026-09-05.**
 
 ---
 
@@ -53,8 +53,8 @@
 ```bash
 git fetch upstream --prune
 
-# guarda ajustes locais não commitados (bind 127.0.0.1)
-git stash push -m "ajustes locais" docker/docker-compose.dev.yml docker/docker-compose.db_dev.yml
+# guarda ajustes locais não commitados (bind 127.0.0.1 e fix de knip no build do front)
+git stash push -m "ajustes locais" docker/docker-compose.dev.yml docker/docker-compose.db_dev.yml docker/Dockerfile.frontend
 
 # rebase a branch de trabalho sobre o upstream (replaya os commits de docs no topo)
 git checkout personalizacao
@@ -151,9 +151,16 @@ gunzip -c "$BK/db_sparkyfitness.sql.gz" | docker exec -i sparkyfitness-db psql -
    `docker/docker-compose.db_dev.yml` a porta é `"127.0.0.1:5432:5432"` (upstream usa `"5432:5432"`).
    *Motivo:* segurança — não expor o banco na rede. Mantido **não commitado** de propósito.
 
-2. **Provedores de comida configurados** (ver §6).
+2. **`ENV KNIP_DISABLE_RAW_TRANSFER=1` no build do frontend** — em `docker/Dockerfile.frontend`
+   adicionado antes de `pnpm ... run build`.
+   *Motivo:* O upstream passou a rodar `knip` durante o build do frontend. O parser interno (`oxc-parser`)
+   tenta alocar um `ArrayBuffer` de 6 GiB para transferência de memória rápida (raw transfer), o que falha com
+   `RangeError: Array buffer allocation failed` no Alpine/musl dentro da VM Colima (4 GiB de RAM sem swap).
+   A variável desativa o raw-transfer e faz o build passar com uso mínimo de memória. Mantido **não commitado** de propósito.
 
-3. **Seed de dados brasileiros** (ver §7) — dados no banco, não em arquivo de código.
+3. **Provedores de comida configurados** (ver §6).
+
+4. **Seed de dados brasileiros** (ver §7) — dados no banco, não em arquivo de código.
 
 ---
 
@@ -225,6 +232,26 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-09-05 — App atualizado para **v1.6.4** (build local); 684 commits do upstream, 6 migrations novas
+- `main` `72217967` → `4cdf4752`; `personalizacao` = `4cdf4752` + os 8 commits de docs por cima. **684 commits** do upstream, tags **v1.6.3** e **v1.6.4**.
+  O `package.json` avançou para `1.6.4`. Rebase sem nenhum conflito.
+- ⚠️ **6 migrations novas**, todas aplicadas no boot com sucesso (RLS reaplicada em seguida):
+  1. `20260821170000_add_food_search_all_providers_default.sql` — Default de busca de alimentos para todos os provedores configurados.
+  2. `20260827180000_add_bmr_to_check_in_measurements.sql` — Armazenamento de TMB (BMR) nas medições de check-in.
+  3. `20260829171500_add_total_calories_capture_time.sql` — Horário de captura de calorias totais.
+  4. `20260830120000_add_notes_to_food_tables.sql` — Campo de notas para alimentos e itens do diário.
+  5. `20260901120000_add_entry_yield_to_food_entry_meals.sql` — Rendimento de porção em refeições compostas.
+  6. `20260904120000_add_chart_scale_mode_preference.sql` — Preferência de escala para gráficos (modo zero vs adaptativo).
+- ⚠️ **Ajuste no build do frontend:** O upstream integrou `knip` na validação de build (`build` chama `validate`). O `oxc-parser` tenta alocar um `ArrayBuffer` fixo de 6 GiB que estoura a memória do Alpine na VM Colima (`RangeError: Array buffer allocation failed`). Resolvido inserindo `ENV KNIP_DISABLE_RAW_TRANSFER=1` no `docker/Dockerfile.frontend` (mantido via stash).
+- **Novidades do upstream:** Suporte a Docker secrets via arquivo (`_FILE`), notas em alimentos, rendimento de refeições, escala de gráficos configurável, suporte aprimorado a provedores e centenas de melhorias e correções no frontend e mobile.
+- **Build local:** `codewithcj/sparkyfitness_server:latest` e `codewithcj/sparkyfitness:latest` construídos via Docker BuildKit. Imagens anteriores salvas em `:rollback-20260905`. Tags antigas de rollback de 17/08 e 18/08 foram removidas da VM.
+- **Backup pré-update:** `/Volumes/FORD_2TB/claudeAI/backups/SparkyFitness_20260905_183811/` e `~/.sparkyfitness/backups/pre-upstream-20260905_183811.dump` (923K, 104 tabelas validadas).
+- **Validação de testes:**
+  - Servidor: **3.855 passando**, 1 falha ambiental (`outboundProxy.test.ts` de sempre).
+  - Frontend: **1.133 passando**, 0 falhas (114 suítes de testes 100% OK).
+- **Dados preservados:** users=2, foods=1369, food_entries=620, meals=121, food_entry_meals=24, exercise_entries=240, sleep_entries=48, migrations=217.
+- Saúde da stack: Frontend HTTP 200, `/api/health` UP, disco da VM em 60% (22,3 GB livres).
 
 ### 2026-08-22 — Sync de 109 commits; 4 migrations novas; duplicação de treinos e piso de segurança calórica
 - `main` `313a5067` → `72217967`; `personalizacao` = `72217967` + os 7 commits de docs por cima. **109 commits** do upstream.
