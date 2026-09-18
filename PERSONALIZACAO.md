@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-09-05.**
+> **Última atualização: 2026-09-18.**
 
 ---
 
@@ -232,6 +232,30 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-09-18 — App atualizado para **v1.7.1** (build local); 470 commits do upstream, 11 migrations novas
+- `main` `4cdf4752` → `2f06c524`; `personalizacao` = `2f06c524` + os 9 commits de docs por cima. **470 commits** do upstream, tags **v1.7.0** e **v1.7.1**.
+  O `package.json` avançou para `1.7.1`. Rebase sem nenhum conflito.
+- ⚠️ **11 migrations novas**, todas aplicadas no boot com sucesso (RLS reaplicada em seguida):
+  1. `20260817000000_add_liftosaur_provider_type.sql` — Suporte ao provedor de exercícios Liftosaur.
+  2. `20260901103000_add_openfoodfacts_automatic_sync.sql` — Sincronização automática com Open Food Facts.
+  3. `20260901120000_add_progression_fields_to_workout_preset_exercises.sql` — Campos de progressão em presets de exercícios.
+  4. `20260905150000_add_caffeine_alcohol_water_and_container_links.sql` — Vínculos de cafeína, álcool e recipientes para hidratação.
+  5. `20260908120000_narrow_check_in_bmr_bounds.sql` — Limites mais estreitos para validação de TMB/BMR.
+  6. `20260909203000_deduplicate_strava_activity_details.sql` — Deduplicação de detalhes de atividades Strava.
+  7. `20260910180000_deduplicate_shared_active_calories.sql` — Deduplicação de calorias ativas compartilhadas.
+  8. `20260912150000_preserve_data_on_user_and_library_deletes.sql` — Preservação de dados em exclusões de usuários e biblioteca.
+  9. `20260912193000_better_auth_1_7_schema.sql` — Atualização de esquema do Better Auth 1.7.
+  10. `20260914210000_cleanup_zero_ml_water_entries.sql` — Limpeza de registros de água com 0 ml.
+  11. `20260918162032_add_lap_moving_telemetry.sql` — Telemetria de voltas e movimento em treinos.
+- **Novidades do upstream:** Atualização do Better Auth para 1.7, suporte ao Liftosaur, rastreamento de cafeína/álcool integrado à hidratação, healthcheck no Postgres do docker-compose para evitar race condition no boot, flags para food providers privados, e melhorias maciças no mobile e frontend.
+- **Build local:** `codewithcj/sparkyfitness_server:latest` e `codewithcj/sparkyfitness:latest` construídos via Docker BuildKit. Imagens anteriores salvas em `:rollback-20260918`. Tags antigas de rollback de 22/08 e 05/09 foram removidas da VM (1,95 GB liberados).
+- **Backup pré-update:** `/Volumes/FORD_2TB/claudeAI/backups/SparkyFitness_20260918_174617/` e `~/.sparkyfitness/backups/pre-upstream-20260918_174617.dump` (962K, 104 tabelas validadas).
+- **Validação de testes:**
+  - Servidor: **4.728 passando**, 0 falhas (100% aprovado!).
+  - Frontend: **1.347 passando**, 0 falhas (144 suítes de testes 100% aprovadas!).
+- **Dados preservados:** users=2, foods=1369, food_entries=620, meals=121, food_entry_meals=24, exercise_entries=291, sleep_entries=59, migrations=228.
+- Saúde da stack: Frontend HTTP 200, `/api/health` UP, disco da VM em 62% (21,4 GB livres).
 
 ### 2026-09-05 — App atualizado para **v1.6.4** (build local); 684 commits do upstream, 6 migrations novas
 - `main` `72217967` → `4cdf4752`; `personalizacao` = `4cdf4752` + os 8 commits de docs por cima. **684 commits** do upstream, tags **v1.6.3** e **v1.6.4**.
