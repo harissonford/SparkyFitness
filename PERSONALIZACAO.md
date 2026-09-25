@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-09-18.**
+> **Última atualização: 2026-09-25.**
 
 ---
 
@@ -232,6 +232,27 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-09-25 — App atualizado para **v1.7.2** (build local); 189 commits do upstream, 8 migrations novas
+- `main` `2f06c524` → `5732cce1`; `personalizacao` = `5732cce1` + os commits de docs por cima. **189 commits** do upstream, tag **v1.7.2**.
+  O `package.json` avançou para `1.7.2`. Rebase sem nenhum conflito.
+- ⚠️ **8 migrations novas**, todas aplicadas no boot com sucesso (RLS reaplicada em seguida):
+  1. `20260918170000_backfill_polar_steps_to_check_in.sql` — Backfill de passos Polar para check-ins.
+  2. `20260918180000_widen_health_metric_samples_for_skin_temperature.sql` — Suporte a temperatura da pele em amostras de métricas de saúde.
+  3. `20260918230000_add_admin_system_settings.sql` — Tabela `global_settings` para políticas de sistema no painel de administração.
+  4. `20260921140000_add_sequential_workout_plan_mode.sql` — Modo de planos de treino sequenciais.
+  5. `20260921210000_add_watch_telemetry_observed_at.sql` — Horário observado na telemetria de relógios/watch.
+  6. `20260923170000_add_workout_format_to_presets.sql` — Formatos de treino (WOD / intervalo) nos presets.
+  7. `20260924200000_add_location_and_rir.sql` — Suporte a localização e RIR (Reps in Reserve) nos registros de treino.
+  8. `20260925013000_add_watch_duration_minutes.sql` — Duração em minutos para sessões de relógio.
+- **Novidades do upstream:** Tag `v1.7.2`, painel admin com configurações globais do sistema, suporte expandido a Polar (temperatura, cardio load, amostras intraday), acompanhamento ao vivo de treinos via relógio, seleção múltipla de alimentos para registro no mobile, novos idiomas, e ajustes de segurança em provedores OIDC e Better Auth.
+- **Build local:** `codewithcj/sparkyfitness_server:latest` e `codewithcj/sparkyfitness:latest` reconstruídos via Docker BuildKit. Imagens anteriores marcadas em `:rollback-20260925`. Tags mais antigas (`:rollback-20260915`) removidas da VM para conservar espaço.
+- **Backup pré-update:** `/Volumes/FORD_2TB/claudeAI/backups/SparkyFitness_20260925_154119/` e `~/.sparkyfitness/backups/pre-upstream-20260925_154119.dump` (1.0M dump, 492K sql.gz, 106 tabelas validadas).
+- **Validação de testes:**
+  - Frontend: **1.376 passando**, 0 falhas (148 suítes 100% OK).
+  - Servidor: **4.955 passando** (404 suítes OK).
+- **Dados preservados:** users=2, foods=1369, food_entries=620, meals=121, food_entry_meals=24, exercise_entries=305, sleep_entries=60, migrations=236.
+- **Saúde da stack:** Frontend HTTP 200 na porta 3004, `/api/health` UP (200 OK), todos os 3 containers healthy.
 
 ### 2026-09-18 — App atualizado para **v1.7.1** (build local); 470 commits do upstream, 11 migrations novas
 - `main` `4cdf4752` → `2f06c524`; `personalizacao` = `2f06c524` + os 9 commits de docs por cima. **470 commits** do upstream, tags **v1.7.0** e **v1.7.1**.
