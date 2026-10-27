@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-09-25.**
+> **Última atualização: 2026-10-27.**
 
 ---
 
@@ -232,6 +232,33 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-10-27 — App atualizado para **v1.9.0** (build local); 1.154 commits do upstream, 49 migrations novas
+- `main` `5732cce1` → `67a8febb1`; `personalizacao` rebaseado sobre `upstream/main` com os commits de docs mantidos por cima. **1.154 commits** do upstream cobrindo as releases **v1.8.0** e **v1.9.0**.
+  O `package.json` avançou para `1.9.0`. Rebase limpo sem nenhum conflito.
+- ⚠️ **49 migrations novas**, todas aplicadas no boot com sucesso (RLS reaplicada em seguida):
+  1. Suporte a rotas com rastreamento GPS e provedor Valhalla (`20261021120000_add_routes.sql`, `20261021120100_allow_generated_route_source.sql`, `20261021120200_add_valhalla_routing_provider_type.sql`).
+  2. Inventário de anilhas/placas para barra e exercícios de peso livre (`20261024100000_create_plate_inventories.sql`).
+  3. Configurações de zonas de frequência cardíaca personalizadas e contagem de zonas na interface (`20261022120000_add_heart_rate_zone_settings.sql`, `20261025120000_add_hr_zone_display_count.sql`).
+  4. Metas de corrida e testes de aptidão física / VO2 max (`20261015120000_create_run_goals.sql`, `20261018120000_create_fitness_tests.sql`).
+  5. Múltiplos check-ins de humor por dia com foco e energia (`20261020000000_add_energy_focus_to_mood_entries.sql`, `20261021000000_multiple_mood_checkins.sql`).
+  6. Meta semanal de peso (`20261022140000_add_weekly_weight_goal.sql`).
+  7. Esforço de raciocínio da IA configurável e persistência de estado do assistente nutricional (`20261008213000_ai_reasoning_effort.sql`, `20261008220000_food_assistant_state.sql`).
+  8. Rastreamento de quilometragem e uso de sapatos/tênis (`20261012120000_create_shoes.sql`).
+  9. Programas de corrida pré-definidos e personalizados (`20261010200000_create_run_programs.sql`, `20261013140000_add_custom_run_programs.sql`).
+  10. Registro de sessões de mindfulness (`20261005193000_create_mindfulness_sessions.sql`).
+  11. Novos provedores de dados: Intervals.icu (`intervals`), DSLD (`dsld`), Livsmedelsverket (`livsmedelsverket`) e Canadian Nutrient File (`cnf`).
+  12. Verificação de versão do aplicativo configurável (`20261025170000_add_enable_version_check.sql`).
+- **Faxina de disco da VM (resolução de erro de disco):** Durante o build anterior, o disco `/dev/vdb1` da VM Colima `odysseus` atingiu 100% de uso (58 GB / 59 GB) devido a 50,3 GB de cache acumulado do Docker BuildKit. Foi executada a limpeza profunda com `docker builder prune -a -f` e descarte de tags antigas de rollback, liberando mais de 44 GB e restabelecendo o disco em **28% de uso (41 GB livres)**.
+- **Build local:** `codewithcj/sparkyfitness_server:latest` e `codewithcj/sparkyfitness:latest` construídos via Docker BuildKit. Imagens anteriores marcadas em `:rollback-20261027`.
+- **Backup pré-update:** `/Volumes/FORD_2TB/claudeAI/backups/SparkyFitness_20261027_195106/` e `~/.sparkyfitness/backups/pre-upstream-20261027_195106.dump` (1.1M dump, 548K sql.gz, 117 tabelas validadas).
+- **Validação de testes:**
+  - Frontend: **2.673 passando**, 0 falhas (274 suítes 100% OK).
+  - Servidor: **8.042 passando**, 0 falhas (600 suítes OK).
+- **Dados preservados:** users=2, foods=1369, food_entries=620, meals=121, food_entry_meals=24, exercise_entries=365, sleep_entries=73, migrations=285.
+- **Saúde da stack:** Frontend HTTP 200 na porta 3004, `/api/health` UP (200 OK), todos os 3 containers healthy.
+
+
 
 ### 2026-09-25 — App atualizado para **v1.7.2** (build local); 189 commits do upstream, 8 migrations novas
 - `main` `2f06c524` → `5732cce1`; `personalizacao` = `5732cce1` + os commits de docs por cima. **189 commits** do upstream, tag **v1.7.2**.
