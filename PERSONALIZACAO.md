@@ -2,7 +2,7 @@
 
 > Registro operacional da instância self-hosted (fork `harissonford/SparkyFitness`).
 > Não faz parte do upstream — arquivo local do dono da instância.
-> **Última atualização: 2026-10-27.**
+> **Última atualização: 2026-11-22.**
 
 ---
 
@@ -232,6 +232,30 @@ docker ps --filter name=sparky               # 3 containers healthy?
 > O acesso estável é sempre pelo **nome Tailscale**: `http://harisson-mac-m4.taila82c6e.ts.net:3004`.
 
 ## 8. Histórico de atualizações
+
+### 2026-11-22 — App atualizado para **v1.12.1** (build local); 357 commits do upstream e 23 novas migrations
+- **Sincronização upstream**:
+  - `main` avançada e sincronizada com `upstream/main` (`6d314444d`). 357 novos commits cobrindo Desafios/Challenges (web e mobile), integração ZeppBridge (Amazfit/Zepp), novos provedores de alimentos (CookTool, NutrientGraph, Food-Info), suporte a treinos offline no mobile, métricas de recuperação e sono, além de correções críticas de sincronização e segurança.
+  - `personalizacao` rebaseada com sucesso sobre `upstream/main` e enviada com `--force-with-lease` para `origin personalizacao`.
+  - Modificações locais preservadas: bind `127.0.0.1:5432` nos compose de dev e `KNIP_DISABLE_RAW_TRANSFER=1` no `Dockerfile.frontend`.
+- **Imagens Docker e Stack**:
+  - Base nginx do frontend atualizada pelo upstream para `nginx:1.30.7-alpine3.24` (segurança NGINX2Root).
+  - Imagens locais construídas com BuildKit:
+    - `codewithcj/sparkyfitness_server:latest` (Node 24 Alpine, build local).
+    - `codewithcj/sparkyfitness:latest` (Vite / React 19 / Nginx 1.30.7, build local).
+  - Containers recriados e saudáveis (`docker-sparkyfitness-frontend-1`, `docker-sparkyfitness-server-1`, `sparkyfitness-db`).
+  - Tags de rollback salvas: `codewithcj/sparkyfitness{,_server}:rollback-20261122`.
+- **Banco de dados & Migrations**:
+  - Backup pré-update salvo em `/Volumes/FORD_2TB/claudeAI/backups/SparkyFitness_20261122_172500/sparkyfitness_db.dump` e espelhado em `~/.sparkyfitness/backups/pre-upstream-20261122_172500.dump` (1.2 MB).
+  - 23 novas migrations aplicadas com sucesso (19 na rodada anterior + 4 mais recentes: `20261112120000_create_challenges.sql`, `20261120180000_alter_verification_id_to_text.sql`, `20261120220000_add_external_food_provider_types.sql`, `20261121120000_add_zeppbridge_provider_type.sql`). Total acumulado no banco: **319 migrations**.
+  - Permissões para `sparky_app` e políticas RLS reaplicadas com sucesso.
+  - Dados íntegros: `users`=2, `foods`=1369, `food_entries`=620, `meals`=121, `food_entry_meals`=24, `exercise_entries`=365, `sleep_entries`=73.
+- **Validação & Testes**:
+  - `/api/health` → `{"status":"UP"}`.
+  - `/api/health/ready` → `{"status":"READY","checks":{"database":"ok","auth":"ok"}}`.
+  - Frontend: 363 suites, 3596 testes passando (100% OK).
+  - Validação frontend e shared (`pnpm run validate`): TypeScript, Prettier, i18n audit e Knip sem nenhum erro.
+  - Servidor vitest: 310 arquivos de teste, 6848 testes passando (0 falhas).
 
 ### 2026-10-27 — App atualizado para **v1.9.0** (build local); 1.154 commits do upstream, 49 migrations novas
 - `main` `5732cce1` → `67a8febb1`; `personalizacao` rebaseado sobre `upstream/main` com os commits de docs mantidos por cima. **1.154 commits** do upstream cobrindo as releases **v1.8.0** e **v1.9.0**.
